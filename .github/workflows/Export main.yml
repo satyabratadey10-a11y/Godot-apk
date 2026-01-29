@@ -1,0 +1,36 @@
+name: Shrink Export Templates
+
+on:
+  push:             # 🟢 Triggers automatically when you save this file
+  workflow_dispatch: # 🔵 Allows manual trigger
+
+jobs:
+  compress-templates:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install 7-Zip 🛠️
+        run: sudo apt-get update && sudo apt-get install -y p7zip-full
+
+      - name: Download Export Templates 📥
+        run: |
+          # Using the exact URL you provided
+          # The quotes "" are very important here because of the '?' and '&' symbols
+          wget -O export_templates.tpz "https://downloads.godotengine.org/?version=4.6&flavor=stable&slug=export_templates.tpz&platform=templates"
+          
+          # Print size to verify download
+          ls -lh export_templates.tpz
+
+      - name: Compress with Ultra Settings 🗜️
+        run: |
+          # Compressing the .tpz file (which is just a zip)
+          # We use the same LZMA2 ultra settings for maximum reduction
+          
+          7z a -t7z -m0=lzma2 -mx=9 -mfb=64 -md=64m -ms=on compressed_templates.7z export_templates.tpz
+
+      - name: Upload Artifact 📤
+        uses: actions/upload-artifact@v4
+        with:
+          name: Compressed-Export-Templates
+          path: compressed_templates.7z
+          retention-days: 1
