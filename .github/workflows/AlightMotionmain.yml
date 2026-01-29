@@ -1,0 +1,39 @@
+name: Shrink XAPK
+
+on:
+  push:             # 🟢 Triggers automatically when you save this file
+  workflow_dispatch: # 🔵 Allows manual trigger
+
+jobs:
+  compress-xapk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install 7-Zip 🛠️
+        run: sudo apt-get update && sudo apt-get install -y p7zip-full
+
+      - name: Download XAPK 📥
+        run: |
+          # Downloading the specific XAPK file
+          wget -O target_app.xapk "https://apkdownloader.cc/storage/files/2026/01/after.motion.z.apk.v5.0.273.1028414.xapk"
+          
+          # Print size to verify download
+          ls -lh target_app.xapk
+
+      - name: Compress with Ultra Settings 🗜️
+        run: |
+          # Compressing the .xapk file
+          # -m0=lzma2 : Strongest compression method
+          # -mx=9     : Ultra compression level
+          # -mfb=64   : Larger word size finds more patterns
+          # -md=64m   : Larger dictionary size
+          # -ms=on    : Solid archiving
+          
+          7z a -t7z -m0=lzma2 -mx=9 -mfb=64 -md=64m -ms=on compressed_app.7z target_app.xapk
+
+      - name: Upload Artifact 📤
+        uses: actions/upload-artifact@v4
+        with:
+          name: Compressed-XAPK
+          path: compressed_app.7z
+          retention-days: 1
