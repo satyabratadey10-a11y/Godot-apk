@@ -1,0 +1,41 @@
+name: Shrink Godot APK
+
+on:
+  push:             # 🟢 Triggers automatically when you save/edit this file
+  workflow_dispatch: # 🔵 Allows you to run it manually if needed
+
+jobs:
+  compress-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install 7-Zip 🛠️
+        run: sudo apt-get update && sudo apt-get install -y p7zip-full
+
+      - name: Download Godot APK 📥
+        run: |
+          # Downloading the specific Godot 4.6 Android Editor file
+          # We use the link you provided earlier
+          wget -O godot_editor.apk "https://downloads.godotengine.org/?version=4.6&flavor=stable&slug=android_editor.apk&platform=android.apk"
+          
+          # Print size to verify download
+          ls -lh godot_editor.apk
+
+      - name: Compress with Ultra Settings (No Encryption) 🗜️
+        run: |
+          # 7z compression flags for maximum shrinkage:
+          # -t7z      : Output format 7z
+          # -m0=lzma2 : Strongest compression method
+          # -mx=9     : Ultra compression level
+          # -mfb=64   : larger word size finds more patterns
+          # -md=64m   : larger dictionary size
+          # -ms=on    : solid archiving (groups files to squash them tighter)
+          
+          7z a -t7z -m0=lzma2 -mx=9 -mfb=64 -md=64m -ms=on compressed_godot.7z godot_editor.apk
+
+      - name: Upload Artifact 📤
+        uses: actions/upload-artifact@v4
+        with:
+          name: Compressed-Godot-Editor
+          path: compressed_godot.7z
+          retention-days: 1
