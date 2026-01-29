@@ -1,4 +1,4 @@
-name: Ultra Shrink Templates (AAR Surgery)
+name: Ultra Shrink Templates (Fixed)
 
 on:
   push:
@@ -44,27 +44,26 @@ jobs:
           done
 
           # ===================================================
-          # PHASE 2: Clean the SOURCE ZIP & AAR Files (The Big One)
+          # PHASE 2: Clean the SOURCE ZIP & AAR Files
           # ===================================================
           echo "Operating on Source Zip..."
           unzip android_source.zip -d surgery_table/source_work
           
-          # Now we must attack the AAR files inside libs/debug and libs/release
-          # AAR files usually store libs in a 'jni' folder
-          
+          # Iterate over AAR files in debug and release folders
           for aar_path in surgery_table/source_work/libs/debug/*.aar surgery_table/source_work/libs/release/*.aar; do
             echo "Performing surgery on inner AAR: $aar_path"
+            
             # 1. Unzip AAR to a temp folder
             mkdir surgery_table/aar_work
             unzip "$aar_path" -d surgery_table/aar_work
             
             # 2. Delete unwanted architectures (x86, armv7) inside the AAR
-            # Note: inside AARs, native libs are in 'jni/' not 'lib/'
             find surgery_table/aar_work -type d \( -name "x86" -o -name "x86_64" -o -name "armeabi-v7a" \) -exec rm -rf {} +
             
             # 3. Repack the AAR
             cd surgery_table/aar_work
-            zip -r ../../aar_repacked.aar .
+            # CORRECTION: Use ../ instead of ../../ to place it in surgery_table
+            zip -r ../aar_repacked.aar .
             cd ../..
             
             # 4. Overwrite the original AAR with the smaller one
@@ -74,7 +73,7 @@ jobs:
             rm -rf surgery_table/aar_work
           done
 
-          # Also clean any loose folders in the source zip itself
+          # Clean loose folders in the source zip
           find surgery_table/source_work -type d \( -name "x86" -o -name "x86_64" -o -name "armeabi-v7a" \) -exec rm -rf {} +
 
           # Repack the Source Zip
