@@ -1,0 +1,84 @@
+name: Deep Shrink Templates (Arm64 Only)
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  deep-surgery:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install Tools 🛠️
+        run: sudo apt-get update && sudo apt-get install -y p7zip-full unzip zip
+
+      - name: Download Original Templates 📥
+        run: |
+          wget -O templates.tpz "https://downloads.godotengine.org/?version=4.6&flavor=stable&slug=export_templates.tpz&platform=templates"
+          ls -lh templates.tpz
+
+      - name: Deep Surgery (The "Inception" Step) 🔪
+        run: |
+          # 1. Unzip the main container
+          unzip templates.tpz -d extracted_main
+          cd extracted_main/templates
+          
+          # 2. Delete Non-Android Platforms (Standard Clean)
+          rm -f windows* linux* macos* web* ios*
+          
+          # 3. Create a temp folder for surgery
+          mkdir surgery_table
+          
+          # --- SURGERY ON DEBUG APK ---
+          echo "Operating on Debug APK..."
+          unzip android_debug.apk -d surgery_table/debug
+          # Nuke non-arm64 folders inside the APK
+          find surgery_table/debug -type d \( -name "x86" -o -name "x86_64" -o -name "armeabi-v7a" \) -exec rm -rf {} +
+          # Re-pack the APK
+          cd surgery_table/debug
+          zip -r ../../android_debug.apk .
+          cd ../..
+          rm -rf surgery_table/debug
+
+          # --- SURGERY ON RELEASE APK ---
+          echo "Operating on Release APK..."
+          unzip android_release.apk -d surgery_table/release
+          find surgery_table/release -type d \( -name "x86" -o -name "x86_64" -o -name "armeabi-v7a" \) -exec rm -rf {} +
+          cd surgery_table/release
+          zip -r ../../android_release.apk .
+          cd ../..
+          rm -rf surgery_table/release
+
+          # --- SURGERY ON SOURCE ZIP (The Big One) ---
+          echo "Operating on Source Zip..."
+          unzip android_source.zip -d surgery_table/source
+          # This removes x86/32-bit libs from the source build files too!
+          find surgery_table/source -type d \( -name "x86" -o -name "x86_64" -o -name "armeabi-v7a" \) -exec rm -rf {} +
+          cd surgery_table/source
+          zip -r ../../android_source.zip .
+          cd ../..
+          rm -rf surgery_table/source
+          
+          # Cleanup
+          rm -rf surgery_table
+
+      - name: Final Compress 🗜️
+        run: |
+          cd extracted_main
+          
+          # Zip it back into a TPZ
+          zip -r ../android_deep_shrunk.tpz templates
+          cd ..
+          
+          # 7-Zip Ultra on the result
+          7z a -t7z -m0=lzma2 -mx=9 -mfb=64 -md=64m -ms=on android_deep_shrunk.7z android_deep_shrunk.tpz
+          
+          # Show the final victory size
+          ls -lh android_deep_shrunk.7z
+
+      - name: Upload Artifact 📤
+        uses: actions/upload-artifact@v4
+        with:
+          name: Deep-Shrunk-Templates
+          path: android_deep_shrunk.7z
+          retention-days: 1
