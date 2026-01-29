@@ -1,0 +1,43 @@
+name: Download and Compress APK
+
+on:
+  workflow_dispatch: # This allows you to trigger it manually with a button click
+    inputs:
+      apk_url:
+        description: 'Direct URL to the APK file'
+        required: true
+
+jobs:
+  compress-and-upload:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install 7-Zip 🛠️
+        run: sudo apt-get update && sudo apt-get install -y p7zip-full
+
+      - name: Download APK 📥
+        run: |
+          echo "Downloading from: ${{ inputs.apk_url }}"
+          wget -O godot_editor.apk "${{ inputs.apk_url }}"
+          
+          # Check the size to ensure full download
+          ls -lh godot_editor.apk
+
+      - name: Compress with Ultra Settings 🗜️
+        run: |
+          # 7z flags explanation:
+          # a        : Add to archive
+          # -t7z     : Type = 7z
+          # -m0=lzma2: Use LZMA2 algorithm (efficient for large files)
+          # -mx=9    : Ultra compression level
+          # -mfb=64  : Word size (helps find repeating patterns)
+          # -md=64m  : Dictionary size (larger memory usage for better compression)
+          
+          7z a -t7z -m0=lzma2 -mx=9 -mfb=64 -md=64m -ms=on compressed_godot.7z godot_editor.apk
+
+      - name: Upload Artifact 📤
+        uses: actions/upload-artifact@v4
+        with:
+          name: Compressed-Godot-Editor
+          path: compressed_godot.7z
+          retention-days: 1 # Keeps storage cleaner
