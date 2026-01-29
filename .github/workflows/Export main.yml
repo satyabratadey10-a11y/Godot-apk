@@ -1,36 +1,57 @@
-name: Shrink Export Templates
+name: Shrink Android Templates Only
 
 on:
-  push:             # 🟢 Triggers automatically when you save this file
-  workflow_dispatch: # 🔵 Allows manual trigger
+  push:
+  workflow_dispatch:
 
 jobs:
-  compress-templates:
+  surgery-and-compress:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Install 7-Zip 🛠️
-        run: sudo apt-get update && sudo apt-get install -y p7zip-full
+      - name: Install Tools 🛠️
+        run: sudo apt-get update && sudo apt-get install -y p7zip-full unzip zip
 
-      - name: Download Export Templates 📥
+      - name: Download Original Templates 📥
         run: |
-          # Using the exact URL you provided
-          # The quotes "" are very important here because of the '?' and '&' symbols
-          wget -O export_templates.tpz "https://downloads.godotengine.org/?version=4.6&flavor=stable&slug=export_templates.tpz&platform=templates"
+          # Download the full 1GB+ file
+          wget -O templates.tpz "https://downloads.godotengine.org/releases/4.6-stable/Godot_v4.6-stable_export_templates.tpz"
           
-          # Print size to verify download
-          ls -lh export_templates.tpz
+          # Check initial huge size
+          ls -lh templates.tpz
 
-      - name: Compress with Ultra Settings 🗜️
+      - name: Perform Surgery (Delete Non-Android) 🔪
         run: |
-          # Compressing the .tpz file (which is just a zip)
-          # We use the same LZMA2 ultra settings for maximum reduction
+          # 1. Unzip the TPZ (it is just a zip file)
+          unzip templates.tpz -d extracted_data
           
-          7z a -t7z -m0=lzma2 -mx=9 -mfb=64 -md=64m -ms=on compressed_templates.7z export_templates.tpz
+          # 2. Go into the folder
+          cd extracted_data/templates
+          
+          # 3. DELETE everything that is NOT Android
+          # We remove windows, mac, linux, web, ios
+          rm -f windows* linux* macos* web* ios*
+          
+          # 4. Show what is left (Should only be android_source.zip, android_debug.apk, etc.)
+          ls -lh
+
+      - name: Repack and Compress 🗜️
+        run: |
+          # 1. Zip the remaining Android files back into a TPZ
+          cd extracted_data
+          zip -r ../android_only_templates.tpz templates
+          cd ..
+          
+          # 2. Compress that new tiny TPZ into a 7z for maximum saving
+          # No encryption, Ultra settings
+          7z a -t7z -m0=lzma2 -mx=9 -mfb=64 -md=64m -ms=on android_templates_minimal.7z android_only_templates.tpz
+          
+          # 3. Final size check (Get ready to be amazed!)
+          ls -lh android_templates_minimal.7z
 
       - name: Upload Artifact 📤
         uses: actions/upload-artifact@v4
         with:
-          name: Compressed-Export-Templates
-          path: compressed_templates.7z
+          name: Android-Only-Templates
+          path: android_templates_minimal.7z
           retention-days: 1
