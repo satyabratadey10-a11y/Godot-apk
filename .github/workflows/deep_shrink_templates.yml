@@ -1,11 +1,11 @@
-name: Deep Shrink Templates (Arm64 Only)
+name: Ultra Shrink Templates (AAR Surgery)
 
 on:
   push:
   workflow_dispatch:
 
 jobs:
-  deep-surgery:
+  ultra-surgery:
     runs-on: ubuntu-latest
 
     steps:
@@ -15,51 +15,75 @@ jobs:
       - name: Download Original Templates 📥
         run: |
           wget -O templates.tpz "https://downloads.godotengine.org/?version=4.6&flavor=stable&slug=export_templates.tpz&platform=templates"
-          ls -lh templates.tpz
 
-      - name: Deep Surgery (The "Inception" Step) 🔪
+      - name: Perform Ultra Surgery 🏥
         run: |
           # 1. Unzip the main container
           unzip templates.tpz -d extracted_main
           cd extracted_main/templates
           
-          # 2. Delete Non-Android Platforms (Standard Clean)
+          # 2. Delete Non-Android Platforms
           rm -f windows* linux* macos* web* ios*
           
-          # 3. Create a temp folder for surgery
+          # 3. Create a temp surgery table
           mkdir surgery_table
           
-          # --- SURGERY ON DEBUG APK ---
-          echo "Operating on Debug APK..."
-          unzip android_debug.apk -d surgery_table/debug
-          # Nuke non-arm64 folders inside the APK
-          find surgery_table/debug -type d \( -name "x86" -o -name "x86_64" -o -name "armeabi-v7a" \) -exec rm -rf {} +
-          # Re-pack the APK
-          cd surgery_table/debug
-          zip -r ../../android_debug.apk .
-          cd ../..
-          rm -rf surgery_table/debug
+          # ===================================================
+          # PHASE 1: Clean the APKs (Debug & Release)
+          # ===================================================
+          for apk in android_debug.apk android_release.apk; do
+            echo "Operating on $apk..."
+            unzip $apk -d surgery_table/apk_work
+            # Delete non-arm64 libraries
+            find surgery_table/apk_work -type d \( -name "x86" -o -name "x86_64" -o -name "armeabi-v7a" \) -exec rm -rf {} +
+            # Repack
+            cd surgery_table/apk_work
+            zip -r ../../$apk .
+            cd ../..
+            rm -rf surgery_table/apk_work
+          done
 
-          # --- SURGERY ON RELEASE APK ---
-          echo "Operating on Release APK..."
-          unzip android_release.apk -d surgery_table/release
-          find surgery_table/release -type d \( -name "x86" -o -name "x86_64" -o -name "armeabi-v7a" \) -exec rm -rf {} +
-          cd surgery_table/release
-          zip -r ../../android_release.apk .
-          cd ../..
-          rm -rf surgery_table/release
-
-          # --- SURGERY ON SOURCE ZIP (The Big One) ---
+          # ===================================================
+          # PHASE 2: Clean the SOURCE ZIP & AAR Files (The Big One)
+          # ===================================================
           echo "Operating on Source Zip..."
-          unzip android_source.zip -d surgery_table/source
-          # This removes x86/32-bit libs from the source build files too!
-          find surgery_table/source -type d \( -name "x86" -o -name "x86_64" -o -name "armeabi-v7a" \) -exec rm -rf {} +
-          cd surgery_table/source
+          unzip android_source.zip -d surgery_table/source_work
+          
+          # Now we must attack the AAR files inside libs/debug and libs/release
+          # AAR files usually store libs in a 'jni' folder
+          
+          for aar_path in surgery_table/source_work/libs/debug/*.aar surgery_table/source_work/libs/release/*.aar; do
+            echo "Performing surgery on inner AAR: $aar_path"
+            # 1. Unzip AAR to a temp folder
+            mkdir surgery_table/aar_work
+            unzip "$aar_path" -d surgery_table/aar_work
+            
+            # 2. Delete unwanted architectures (x86, armv7) inside the AAR
+            # Note: inside AARs, native libs are in 'jni/' not 'lib/'
+            find surgery_table/aar_work -type d \( -name "x86" -o -name "x86_64" -o -name "armeabi-v7a" \) -exec rm -rf {} +
+            
+            # 3. Repack the AAR
+            cd surgery_table/aar_work
+            zip -r ../../aar_repacked.aar .
+            cd ../..
+            
+            # 4. Overwrite the original AAR with the smaller one
+            mv surgery_table/aar_repacked.aar "$aar_path"
+            
+            # 5. Cleanup
+            rm -rf surgery_table/aar_work
+          done
+
+          # Also clean any loose folders in the source zip itself
+          find surgery_table/source_work -type d \( -name "x86" -o -name "x86_64" -o -name "armeabi-v7a" \) -exec rm -rf {} +
+
+          # Repack the Source Zip
+          cd surgery_table/source_work
           zip -r ../../android_source.zip .
           cd ../..
-          rm -rf surgery_table/source
-          
-          # Cleanup
+          rm -rf surgery_table/source_work
+
+          # Cleanup surgery table
           rm -rf surgery_table
 
       - name: Final Compress 🗜️
@@ -67,18 +91,18 @@ jobs:
           cd extracted_main
           
           # Zip it back into a TPZ
-          zip -r ../android_deep_shrunk.tpz templates
+          zip -r ../android_ultra_shrunk.tpz templates
           cd ..
           
           # 7-Zip Ultra on the result
-          7z a -t7z -m0=lzma2 -mx=9 -mfb=64 -md=64m -ms=on android_deep_shrunk.7z android_deep_shrunk.tpz
+          7z a -t7z -m0=lzma2 -mx=9 -mfb=64 -md=64m -ms=on android_ultra_shrunk.7z android_ultra_shrunk.tpz
           
           # Show the final victory size
-          ls -lh android_deep_shrunk.7z
+          ls -lh android_ultra_shrunk.7z
 
       - name: Upload Artifact 📤
         uses: actions/upload-artifact@v4
         with:
-          name: Deep-Shrunk-Templates
-          path: android_deep_shrunk.7z
+          name: Ultra-Shrunk-Templates
+          path: android_ultra_shrunk.7z
           retention-days: 1
